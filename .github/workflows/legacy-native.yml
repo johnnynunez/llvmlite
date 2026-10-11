@@ -38,6 +38,18 @@ jobs:
         with:
           arch: arm64
           toolset: '14.44'
+      - uses: conda-incubator/setup-conda-standalone@00a34805e93a8b640aee5f8a20e8f481ad77e3b4
+        with:
+          channel: bootstrap-win-arm64-round-2-native
+          conda-standalone-version: 26.3.2.post1
+          destination-directory: ${{ runner.temp }}/conda-standalone
+      - name: Supply native TBB optional backend explicitly
+        shell: pwsh
+        run: |
+          & $env:CONDA_EXE create --prefix "$env:RUNNER_TEMP/tbb-native" --yes -c https://repo.anaconda.com/pkgs/main tbb-devel=2023.0.0
+          if ($LASTEXITCODE -ne 0) {throw 'native TBB development closure failed'}
+          "TBBROOT=$env:RUNNER_TEMP/tbb-native/Library" | Out-File $env:GITHUB_ENV -Append
+          "$env:RUNNER_TEMP/tbb-native/Library/bin" | Out-File $env:GITHUB_PATH -Append
       - name: Verify sources and native build interpreter
         shell: pwsh
         run: |
