@@ -1,0 +1,72 @@
+name: Legacy LLVM20 native ARM64 CP312 backport
+on:
+  push:
+    branches: [ci/legacy-arm64-cp312-20261011]
+permissions:
+  contents: read
+jobs:
+  llvm20-native:
+    runs-on: windows-11-arm
+    timeout-minutes: 180
+    env:
+      NUMBA_THREADING_LAYER: workqueue
+      NUMBA_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: johnnynunez/llvmlite
+          ref: 003f3bc29e86bc275b1a0e09cfb6715a436e59e2
+          path: llvmlite-source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: johnnynunez/numba
+          ref: fe6adf722aa093c9be426a04a5990dd24bafaf0c
+          path: numba-source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+          toolset: '14.44'
+      - name: Verify sources and native build interpreter
+        shell: pwsh
+        run: |
+          if ((git -C llvmlite-source rev-parse HEAD) -ne '003f3bc29e86bc275b1a0e09cfb6715a436e59e2') {throw 'source mismatch'}
+          if ((git -C numba-source rev-parse HEAD) -ne 'fe6adf722aa093c9be426a04a5990dd24bafaf0c') {throw 'source mismatch'}
+          python -c "import sysconfig,sys; assert sysconfig.get_platform()=='win-arm64'; assert sys.version_info[:2]==(3,12)"
+          if ($LASTEXITCODE -ne 0) {throw 'not native CP312'}
+          "PIP_CACHE_DIR=$env:RUNNER_TEMP/pip-cache" | Out-File $env:GITHUB_ENV -Append
+          python -m pip install build setuptools wheel cmake ninja delvewheel pefile numpy==2.4.6
+          if ($LASTEXITCODE -ne 0) {throw 'build dependencies failed'}
+          python harness/legacy-ci/test_legacy_backport.py llvmlite-source -v
+          if ($LASTEXITCODE -ne 0) {throw 'llvmlite regression'}
+          python harness/legacy-ci/test_numba_abi_backport.py numba-source -v
+          if ($LASTEXITCODE -ne 0) {throw 'Numba ABI regression'}
+      - name: Build LLVM20 and pinned experimental wheels
+        shell: pwsh
+        run: '& ./harness/legacy-ci/legacy_build.ps1'
+      - name: Capture exact built Numba NumPy rejection
+        shell: pwsh
+        run: |
+          python -m pip install numpy==2.5.1
+          if ($LASTEXITCODE -ne 0) {throw 'NumPy install failed'}
+          python harness/legacy-ci/check_installed_rejection.py "$env:RUNNER_TEMP/legacy-stage/numpy251-rejection.json"
+          if ($LASTEXITCODE -ne 0) {throw 'rejection not reproduced'}
+      - name: Upload build diagnostics and any wheels
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-llvm20-arm64-cp312
+          path: ${{ runner.temp }}/legacy-stage
+          if-no-files-found: error
+          retention-days: 14
