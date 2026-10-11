@@ -38,7 +38,7 @@ jobs:
       - name: Native build environment
         run: |
           export CONDA_PREFIX="${RUNNER_TEMP}/numba-native"
-          "${CONDA_EXE}" create --prefix "${CONDA_PREFIX}" --yes -c https://repo.anaconda.com/pkgs/main python=3.12 pip setuptools "cmake>=4.2" -c https://conda.anaconda.org/numba/label/llvm_wheel llvmdev=22.1.0 libxml2
+          "${CONDA_EXE}" create --prefix "${CONDA_PREFIX}" --yes -c https://conda.anaconda.org/numba/label/llvm_wheel -c https://repo.anaconda.com/pkgs/main python=3.12 pip setuptools "cmake>=4.2" llvmdev=22.1.0 libxml2
           echo "${CONDA_PREFIX}" >> "${GITHUB_PATH}"
           echo "${CONDA_PREFIX}/Scripts" >> "${GITHUB_PATH}"
           echo "${CONDA_PREFIX}/Library/bin" >> "${GITHUB_PATH}"
